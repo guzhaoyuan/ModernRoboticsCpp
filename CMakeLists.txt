@@ -98,7 +98,12 @@ set(LIB_TEST_SOURCES
 add_executable(lib_test ${LIB_TEST_SOURCES})
 target_link_libraries( lib_test ModernRoboticsCpp gtest_main)
 
-
+# added by zhaoyuan
+set(MY_TEST_SOURCES
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/myTest.cpp
+)
+add_executable(myTest ${MY_TEST_SOURCES})
+target_link_libraries(myTest ModernRoboticsCpp gtest_main)
 
 install (TARGETS ModernRoboticsCpp
         ARCHIVE DESTINATION lib
