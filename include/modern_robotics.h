@@ -361,25 +361,25 @@ Eigen::VectorXd InverseDynamics(const Eigen::VectorXd&, const Eigen::VectorXd&, 
 
 
 /* 
- * Function: This function uses forward-backward Newton-Euler iterations to solve the 
- * equation:
- * taulist = Mlist(thetalist) * ddthetalist + c(thetalist, dthetalist) ...
- *           + g(thetalist) + Jtr(thetalist) * Flist
- * Inputs:
- *  thetalist: n-vector of joint variables
- *  dthetalist: n-vector of joint rates
- *  ddthetalist: n-vector of joint accelerations
- *  g: Gravity vector g
- *  Flist: Spatial force applied to each body
- *  Mlist: List of link frames {i} relative to {i-1} at the home position
- *  Glist: Spatial inertia matrices Gi of the links
- *  Slist: Screw axes Si of the joints in a space frame, in the format
- *         of a matrix with the screw axes as the columns.
- * 
- * Outputs:
- *  taulist: The n-vector of required joint forces/torques
- * 
- */
+* Function: This function uses forward-backward Newton-Euler iterations to solve the 
+* equation:
+* taulist = Mlist(thetalist) * ddthetalist + c(thetalist, dthetalist) ...
+*           + g(thetalist) + Jtr(thetalist) * Ftip
+* Inputs:
+*  thetalist: n-vector of joint variables
+*  dthetalist: n-vector of joint rates
+*  ddthetalist: n-vector of joint accelerations
+*  g: Gravity vector g
+*  Flist: Body frame force applied to each body
+*  Mlist: List of link frames {i} relative to {i-1} at the home position
+*  Glist: Spatial inertia matrices Gi of the links
+*  Slist: Screw axes Si of the joints in a space frame, in the format
+*         of a matrix with the screw axes as the columns.
+* 
+* Outputs:
+*  taulist: The n-vector of required joint forces/torques
+* 
+*/
 Eigen::VectorXd myInverseDynamics(const Eigen::VectorXd&, const Eigen::VectorXd&, const Eigen::VectorXd&, 
                                    const Eigen::VectorXd&, const Eigen::MatrixXd&, const std::vector<Eigen::MatrixXd>&, 
                                    const std::vector<Eigen::MatrixXd>&, const Eigen::MatrixXd&);
