@@ -424,6 +424,29 @@ Eigen::MatrixXd MassMatrix(const Eigen::VectorXd&,
                                 const std::vector<Eigen::MatrixXd>&, const std::vector<Eigen::MatrixXd>&, const Eigen::MatrixXd&);
 
 /* 
+* Function: This function calls InverseDynamics n times, each time passing a 
+* ddthetalist vector with a single element equal to one and all other 
+* inputs set to zero. Each call of InverseDynamics generates a single 
+* column, and these columns are assembled to create the inertia matrix.       
+*
+* Inputs:
+*  thetalist: n-vector of joint variables
+*  Mlist: List of link frames {i} relative to {i-1} at the home position
+*  Glist: Spatial inertia matrices Gi of the links
+*  Slist: Screw axes Si of the joints in a space frame, in the format
+*         of a matrix with the screw axes as the columns.
+* 
+* Outputs:
+*  M: The numerical inertia matrix M(thetalist) of an n-joint serial
+*     chain at the given configuration thetalist.
+* 
+* This method sctricly follow the Featherstone RBDA2008.
+*/
+Eigen::MatrixXd MassMatrixSimple(const Eigen::VectorXd& thetalist,
+                           const std::vector<Eigen::MatrixXd>& Mlist, 
+                  const std::vector<Eigen::MatrixXd>& Glist, const Eigen::MatrixXd& Slist);
+
+/* 
  * Function: This function calls InverseDynamics with g = 0, Ftip = 0, and 
  * ddthetalist = 0.      
  *
@@ -558,6 +581,29 @@ Eigen::VectorXd InverseDynamicsManipulator(const Eigen::VectorXd&, const Eigen::
 Eigen::VectorXd InverseDynamicsTree(const Eigen::VectorXd&, const Eigen::VectorXd&, const Eigen::VectorXd&, 
                                    const Eigen::VectorXd&, const Eigen::MatrixXd&, const std::vector<Eigen::MatrixXd>&, 
                                    const std::vector<Eigen::MatrixXd>&, const Eigen::MatrixXd&);
+
+/* 
+* Function: This function uses forward-backward Newton-Euler iterations to solve the 
+* differential inverse dynamics equation:
+* Mlist(thetalist) * ddthetalist = ID(thetalist, ddthetalist) - ID(thetalist, 0) 
+* 
+* Inputs:
+*  thetalist: n-vector of joint variables
+*  ddthetalist: n-vector of joint accelerations
+*  Mlist: List of link frames {i} relative to {i-1} at the home position
+*  Glist: Spatial inertia matrices Gi of the links
+*  Slist: Screw axes Si of the joints in a space frame, in the format
+*         of a matrix with the screw axes as the columns.
+* 
+* Outputs:
+*  taulist: The n-vector of required joint forces/torques
+* 
+* This Function sctricly follow the Featherstone RBDA2008. 
+*
+*/
+Eigen::VectorXd DifferentialInverseDynamicsTree(const Eigen::VectorXd&, const Eigen::VectorXd&, 
+                                                const std::vector<Eigen::MatrixXd>&, 
+                                                const std::vector<Eigen::MatrixXd>&, const Eigen::MatrixXd&);
 
 
 /*

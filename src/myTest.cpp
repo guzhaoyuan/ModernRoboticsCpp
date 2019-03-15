@@ -275,7 +275,8 @@ TEST(MRTest, MassMatrixTest) {
 		0, 1, 0, -0.089, 0, 0.425;
 	Eigen::MatrixXd Slist = SlistT.transpose();
 
-	Eigen::MatrixXd M = mr::MassMatrix(thetalist, Mlist, Glist, Slist);
+	// 2ms faster, not trivial!!
+	Eigen::MatrixXd M = mr::MassMatrixSimple(thetalist, Mlist, Glist, Slist);
 
 	Eigen::MatrixXd result(3, 3);
 	result << 22.5433, -0.3071, -0.0072,

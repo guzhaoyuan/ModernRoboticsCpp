@@ -663,6 +663,59 @@ namespace mr {
 	}
 
 	/* 
+	* Function: This function uses forward-backward Newton-Euler iterations to solve the 
+	* differential inverse dynamics equation:
+	* Mlist(thetalist) * ddthetalist = ID(thetalist, ddthetalist) - ID(thetalist, 0) 
+	* 
+	* Inputs:
+	*  thetalist: n-vector of joint variables
+	*  ddthetalist: n-vector of joint accelerations
+	*  g: Gravity vector g
+	*  Mlist: List of link frames {i} relative to {i-1} at the home position
+	*  Glist: Spatial inertia matrices Gi of the links
+	*  Slist: Screw axes Si of the joints in a space frame, in the format
+	*         of a matrix with the screw axes as the columns.
+	* 
+	* Outputs:
+	*  taulist: The n-vector of required joint forces/torques
+	* 
+	* This Function sctricly follow the Featherstone RBDA2008. 
+	*
+	*/
+	Eigen::VectorXd DifferentialInverseDynamicsTree(const Eigen::VectorXd& thetalist, const Eigen::VectorXd& ddthetalist, 
+									const std::vector<Eigen::MatrixXd>& Mlist, 
+									const std::vector<Eigen::MatrixXd>& Glist, const Eigen::MatrixXd& Slist) {
+
+		int n = thetalist.size();
+		Eigen::VectorXd taulist = Eigen::VectorXd::Zero(n);	  // result torque
+		Eigen::MatrixXd Vdi = Eigen::MatrixXd::Zero(6,n+1);   // acceleration
+		Eigen::MatrixXd Fi = Eigen::MatrixXd::Zero(6,n+1);	  // force
+
+		std::vector<Eigen::MatrixXd> AdTi(n+1, Eigen::MatrixXd::Zero(6,6));
+		Eigen::MatrixXd Mi = Eigen::MatrixXd::Identity(4, 4); // adjoint of each frame i in spatial frame
+		Eigen::MatrixXd Ai = Eigen::MatrixXd::Zero(6,n+1);
+
+		for(int i = 1; i < n+1; i++) {
+			Mi = Mi * Mlist[i-1]; // frame i in spatial frame
+			Ai.col(i) = mr::Adjoint(mr::TransInv(Mi)) * Slist.col(i-1); // get screw axis of joint i in frame i
+			AdTi[i] = mr::Adjoint(mr::MatrixExp6(mr::VecTose3(Ai.col(i)*-thetalist(i-1)))
+			          * mr::TransInv(Mlist[i-1])); // transform Vi-1 in {i-1} frame to {i} frame
+			
+			Vdi.col(i) = AdTi[i] * Vdi.col(i-1) + Ai.col(i) * ddthetalist(i-1);
+			Fi.col(i) = Glist[i-1] * Vdi.col(i); // Fb
+		}
+
+		for(int i = n; i > 0; i--) {
+			taulist(i-1) = Ai.col(i).transpose() * Fi.col(i);
+			if(i != 1)
+				Fi.col(i-1) += AdTi[i].transpose() * Fi.col(i); // transform Fi from {i} into {i-1} body frame
+		}
+
+		return taulist;
+	}
+
+
+	/* 
 	 * Function: This function calls InverseDynamics with Ftip = 0, dthetalist = 0, and 
 	 *   ddthetalist = 0. The purpose is to calculate one important term in the dynamics equation       
 	 * Inputs:
@@ -717,6 +770,39 @@ namespace mr {
 			M.col(i) = mr::InverseDynamics(thetalist, dummylist, ddthetalist, 
                              dummyg, dummyforce, Mlist, Glist, Slist);
 		}			
+		return M;		
+	}
+
+	/* 
+  	 * Function: This function calls InverseDynamics n times, each time passing a 
+	 * ddthetalist vector with a single element equal to one and all other 
+	 * inputs set to zero. Each call of InverseDynamics generates a single 
+	 * column, and these columns are assembled to create the inertia matrix.       
+	 *
+	 * Inputs:
+	 *  thetalist: n-vector of joint variables
+	 *  Mlist: List of link frames {i} relative to {i-1} at the home position
+	 *  Glist: Spatial inertia matrices Gi of the links
+	 *  Slist: Screw axes Si of the joints in a space frame, in the format
+	 *         of a matrix with the screw axes as the columns.
+	 * 
+	 * Outputs:
+	 *  M: The numerical inertia matrix M(thetalist) of an n-joint serial
+	 *     chain at the given configuration thetalist.
+	 * 
+	 * This method sctricly follow the Featherstone RBDA2008.
+	 */
+	Eigen::MatrixXd MassMatrixSimple(const Eigen::VectorXd& thetalist,
+                                const std::vector<Eigen::MatrixXd>& Mlist, 
+								const std::vector<Eigen::MatrixXd>& Glist, const Eigen::MatrixXd& Slist) {
+		int n = thetalist.size();
+		Eigen::MatrixXd M = Eigen::MatrixXd::Zero(n,n);	
+		for (int i = 0; i < n; i++) {
+			Eigen::VectorXd ddthetalist = Eigen::VectorXd::Zero(n);
+			ddthetalist(i) = 1;
+			M.col(i) = mr::DifferentialInverseDynamicsTree(thetalist, ddthetalist,
+														Mlist, Glist, Slist);
+		}
 		return M;		
 	}
 
