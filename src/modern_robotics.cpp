@@ -807,6 +807,64 @@ namespace mr {
 	}
 
 	/* 
+	* Function: This function calls InverseDynamics n times, each time passing a 
+	* ddthetalist vector with a single element equal to one and all other 
+	* inputs set to zero. Each call of InverseDynamics generates a single 
+	* column, and these columns are assembled to create the inertia matrix.       
+	*
+	* Inputs:
+	*  thetalist: n-vector of joint variables
+	*  Mlist: List of link frames {i} relative to {i-1} at the home position
+	*  Glist: Spatial inertia matrices Gi of the links
+	*  Slist: Screw axes Si of the joints in a space frame, in the format
+	*         of a matrix with the screw axes as the columns.
+	* 
+	* Outputs:
+	*  H: The numerical inertia matrix H(thetalist) of an n-joint serial
+	*     chain at the given configuration thetalist.
+	* 
+	* This method sctricly follow the Featherstone RBDA2008.
+	*/
+	Eigen::MatrixXd MassMatrixComposite(const Eigen::VectorXd& thetalist,
+                           	const std::vector<Eigen::MatrixXd>& Mlist, 
+                  			const std::vector<Eigen::MatrixXd>& Glist, const Eigen::MatrixXd& Slist) {
+		
+		int n = thetalist.size();
+		Eigen::MatrixXd H = Eigen::MatrixXd::Zero(n,n);
+		std::vector<Eigen::MatrixXd> Iic(n+1, Eigen::MatrixXd::Zero(6,6));
+
+		std::vector<Eigen::MatrixXd> AdTi(n+1, Eigen::MatrixXd::Zero(6,6));
+		Eigen::MatrixXd Mi = Eigen::MatrixXd::Identity(4, 4); // adjoint of each frame i in spatial frame
+		Eigen::MatrixXd Ai = Eigen::MatrixXd::Zero(6,n+1);
+
+		for(int i = 1; i < n+1; i++) {
+			Mi = Mi * Mlist[i-1]; // frame i in spatial frame
+			Ai.col(i) = mr::Adjoint(mr::TransInv(Mi)) * Slist.col(i-1); // get screw axis of joint i in frame i
+			AdTi[i] = mr::Adjoint(mr::MatrixExp6(mr::VecTose3(Ai.col(i)*-thetalist(i-1)))
+			          * mr::TransInv(Mlist[i-1])); // transform Vi-1 in {i-1} frame to {i} frame
+
+			Iic[i] = Glist[i-1];
+		}
+
+		for(int i = n; i > 0; i--) {
+			if(i != 1) {
+				Iic[i-1] += AdTi[i].transpose() * Iic[i] * AdTi[i];
+			}
+			Eigen::VectorXd F = Iic[i] * Ai.col(i);
+			H(i-1,i-1) = Ai.col(i).transpose() * F;
+			int j = i;
+			while(j != 1) {
+				F = AdTi[j].transpose() * F;
+				j--;
+				H(i-1,j-1) = F.transpose() * Ai.col(j);
+				H(j-1,i-1) = H(i-1,j-1);
+			}
+		}
+		return H;
+	}
+
+
+	/* 
   	 * Function: This function calls InverseDynamics with g = 0, Ftip = 0, and 
      * ddthetalist = 0.      
 	 *
@@ -924,6 +982,37 @@ namespace mr {
 		Eigen::VectorXd ddthetalist = H.ldlt().solve(taulist - biasForce); // qdd = m^-1 * ( tau - C )
 		return ddthetalist;
 	}
+
+	/* 
+	* Function: This function computes ddthetalist by solving:
+	* Mlist(thetalist) * ddthetalist = taulist - c(thetalist,dthetalist,fext)
+	* Inputs:
+	*  thetalist: n-vector of joint variables
+	*  dthetalist: n-vector of joint rates
+	*  taulist: An n-vector of joint forces/torques
+	*  g: Gravity vector g
+	*  Ftip: Spatial force applied by the end-effector expressed in frame {n+1}
+	*  Mlist: List of link frames {i} relative to {i-1} at the home position
+	*  Glist: Spatial inertia matrices Gi of the links
+	*  Slist: Screw axes Si of the joints in a space frame, in the format
+	*         of a matrix with the screw axes as the columns.
+	* 
+	* Outputs:
+	*  ddthetalist: The resulting joint accelerations
+	* 
+	* This method strictly follows the featherstone RBDA2008.
+	* The mass matrix is computed by Composite Rigid Body Algorithm.
+	*/
+	Eigen::VectorXd ForwardDynamicsCRBA(const Eigen::VectorXd& thetalist, const Eigen::VectorXd& dthetalist, const Eigen::VectorXd& taulist, 
+									const Eigen::VectorXd& g, const Eigen::MatrixXd& Flist, const std::vector<Eigen::MatrixXd>& Mlist, 
+									const std::vector<Eigen::MatrixXd>& Glist, const Eigen::MatrixXd& Slist) {
+		Eigen::VectorXd ddthetalist0 = Eigen::VectorXd::Zero(thetalist.size());
+		Eigen::VectorXd biasForce = mr::InverseDynamicsManipulator(thetalist, dthetalist, ddthetalist0, g, Flist, Mlist, Glist, Slist); // get C
+		Eigen::MatrixXd H = mr::MassMatrixComposite(thetalist, Mlist, Glist, Slist); // get H
+		Eigen::VectorXd ddthetalist = H.ldlt().solve(taulist - biasForce); // qdd = H^-1 * ( tau - C )
+		return ddthetalist;
+	}
+
 
 	/* 
 	* Function: This function computes ddthetalist by solving:

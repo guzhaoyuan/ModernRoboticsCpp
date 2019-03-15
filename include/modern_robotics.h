@@ -442,9 +442,33 @@ Eigen::MatrixXd MassMatrix(const Eigen::VectorXd&,
 * 
 * This method sctricly follow the Featherstone RBDA2008.
 */
-Eigen::MatrixXd MassMatrixSimple(const Eigen::VectorXd& thetalist,
-                           const std::vector<Eigen::MatrixXd>& Mlist, 
-                  const std::vector<Eigen::MatrixXd>& Glist, const Eigen::MatrixXd& Slist);
+Eigen::MatrixXd MassMatrixSimple(const Eigen::VectorXd&,
+                                 const std::vector<Eigen::MatrixXd>&, 
+                                 const std::vector<Eigen::MatrixXd>&, const Eigen::MatrixXd&);
+
+/* 
+* Function: This function calls InverseDynamics n times, each time passing a 
+* ddthetalist vector with a single element equal to one and all other 
+* inputs set to zero. Each call of InverseDynamics generates a single 
+* column, and these columns are assembled to create the inertia matrix.       
+*
+* Inputs:
+*  thetalist: n-vector of joint variables
+*  Mlist: List of link frames {i} relative to {i-1} at the home position
+*  Glist: Spatial inertia matrices Gi of the links
+*  Slist: Screw axes Si of the joints in a space frame, in the format
+*         of a matrix with the screw axes as the columns.
+* 
+* Outputs:
+*  M: The numerical inertia matrix M(thetalist) of an n-joint serial
+*     chain at the given configuration thetalist.
+* 
+* This method sctricly follow the Featherstone RBDA2008.
+*/
+Eigen::MatrixXd MassMatrixComposite(const Eigen::VectorXd&,
+                                    const std::vector<Eigen::MatrixXd>&, 
+                                    const std::vector<Eigen::MatrixXd>&, const Eigen::MatrixXd&);
+
 
 /* 
  * Function: This function calls InverseDynamics with g = 0, Ftip = 0, and 
