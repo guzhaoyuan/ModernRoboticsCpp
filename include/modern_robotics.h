@@ -509,8 +509,7 @@ Eigen::VectorXd ForwardDynamics(const Eigen::VectorXd&, const Eigen::VectorXd&, 
 
 /* 
 * Function: This function computes ddthetalist by solving:
-* Mlist(thetalist) * ddthetalist = taulist - c(thetalist,dthetalist) 
-*                                  - g(thetalist) - Jtr(thetalist) * Ftip
+* Mlist(thetalist) * ddthetalist = taulist - c(thetalist,dthetalist,fext)
 * Inputs:
 *  thetalist: n-vector of joint variables
 *  dthetalist: n-vector of joint rates
@@ -525,8 +524,58 @@ Eigen::VectorXd ForwardDynamics(const Eigen::VectorXd&, const Eigen::VectorXd&, 
 * Outputs:
 *  ddthetalist: The resulting joint accelerations
 * 
+* This method strictly follows the featherstone RBDA2008.
+* The mass matrix is computed by differential inverse dynamics function.
 */
-Eigen::VectorXd myForwardDynamics(const Eigen::VectorXd&, const Eigen::VectorXd&, const Eigen::VectorXd&, 
+Eigen::VectorXd ForwardDynamicsSimpleMass(const Eigen::VectorXd&, const Eigen::VectorXd&, const Eigen::VectorXd&, 
+                     const Eigen::VectorXd&, const Eigen::MatrixXd&, const std::vector<Eigen::MatrixXd>&, 
+                     const std::vector<Eigen::MatrixXd>&, const Eigen::MatrixXd&);
+
+/* 
+* Function: This function computes ddthetalist by solving:
+* Mlist(thetalist) * ddthetalist = taulist - c(thetalist,dthetalist,fext)
+* Inputs:
+*  thetalist: n-vector of joint variables
+*  dthetalist: n-vector of joint rates
+*  taulist: An n-vector of joint forces/torques
+*  g: Gravity vector g
+*  Ftip: Spatial force applied by the end-effector expressed in frame {n+1}
+*  Mlist: List of link frames {i} relative to {i-1} at the home position
+*  Glist: Spatial inertia matrices Gi of the links
+*  Slist: Screw axes Si of the joints in a space frame, in the format
+*         of a matrix with the screw axes as the columns.
+* 
+* Outputs:
+*  ddthetalist: The resulting joint accelerations
+* 
+* This method strictly follows the featherstone RBDA2008.
+* The mass matrix is computed by Composite Rigid Body Algorithm.
+*/
+Eigen::VectorXd ForwardDynamicsCRBA(const Eigen::VectorXd&, const Eigen::VectorXd&, const Eigen::VectorXd&, 
+                     const Eigen::VectorXd&, const Eigen::MatrixXd&, const std::vector<Eigen::MatrixXd>&, 
+                     const std::vector<Eigen::MatrixXd>&, const Eigen::MatrixXd&);
+
+/* 
+* Function: This function computes ddthetalist by solving:
+* Mlist(thetalist) * ddthetalist = taulist - c(thetalist,dthetalist,fext)
+* Inputs:
+*  thetalist: n-vector of joint variables
+*  dthetalist: n-vector of joint rates
+*  taulist: An n-vector of joint forces/torques
+*  g: Gravity vector g
+*  Ftip: Spatial force applied by the end-effector expressed in frame {n+1}
+*  Mlist: List of link frames {i} relative to {i-1} at the home position
+*  Glist: Spatial inertia matrices Gi of the links
+*  Slist: Screw axes Si of the joints in a space frame, in the format
+*         of a matrix with the screw axes as the columns.
+* 
+* Outputs:
+*  ddthetalist: The resulting joint accelerations
+* 
+* This method strictly follows the featherstone RBDA2008.
+* This function accept Flist with one extra column of force applied to end effector tip.
+*/
+Eigen::VectorXd ForwardDynamicsABA(const Eigen::VectorXd&, const Eigen::VectorXd&, const Eigen::VectorXd&, 
                      const Eigen::VectorXd&, const Eigen::MatrixXd&, const std::vector<Eigen::MatrixXd>&, 
                      const std::vector<Eigen::MatrixXd>&, const Eigen::MatrixXd&);
 
