@@ -424,10 +424,10 @@ Eigen::MatrixXd MassMatrix(const Eigen::VectorXd&,
                                 const std::vector<Eigen::MatrixXd>&, const std::vector<Eigen::MatrixXd>&, const Eigen::MatrixXd&);
 
 /* 
-* Function: This function calls InverseDynamics n times, each time passing a 
-* ddthetalist vector with a single element equal to one and all other 
-* inputs set to zero. Each call of InverseDynamics generates a single 
-* column, and these columns are assembled to create the inertia matrix.       
+* Function: This function calls InverseDynamics n times, each time passing a
+* ddthetalist vector with a single element equal to one and all other
+* inputs set to zero. Each call of InverseDynamics generates a single
+* column, and these columns are assembled to create the inertia matrix.
 *
 * Inputs:
 *  thetalist: n-vector of joint variables
@@ -447,10 +447,9 @@ Eigen::MatrixXd MassMatrixSimple(const Eigen::VectorXd&,
                                  const std::vector<Eigen::MatrixXd>&, const Eigen::MatrixXd&);
 
 /* 
-* Function: This function calls InverseDynamics n times, each time passing a 
-* ddthetalist vector with a single element equal to one and all other 
-* inputs set to zero. Each call of InverseDynamics generates a single 
-* column, and these columns are assembled to create the inertia matrix.       
+* Function: This function computes the composite rigid body inertia,
+* and then compute each element of the mass matrix of using the
+* composite rigid body inertia.
 *
 * Inputs:
 *  thetalist: n-vector of joint variables
@@ -572,7 +571,7 @@ Eigen::VectorXd ForwardDynamicsSimpleMass(const Eigen::VectorXd&, const Eigen::V
 * Outputs:
 *  ddthetalist: The resulting joint accelerations
 * 
-* This method strictly follows the featherstone RBDA2008.
+* This method strictly follows the Featherstone RBDA2008.
 * The mass matrix is computed by Composite Rigid Body Algorithm.
 */
 Eigen::VectorXd ForwardDynamicsCRBA(const Eigen::VectorXd&, const Eigen::VectorXd&, const Eigen::VectorXd&, 
@@ -596,7 +595,7 @@ Eigen::VectorXd ForwardDynamicsCRBA(const Eigen::VectorXd&, const Eigen::VectorX
 * Outputs:
 *  ddthetalist: The resulting joint accelerations
 * 
-* This method strictly follows the featherstone RBDA2008.
+* This method strictly follows the Featherstone RBDA2008.
 * This function accept Flist with one extra column of force applied to end effector tip.
 */
 Eigen::VectorXd ForwardDynamicsABA(const Eigen::VectorXd&, const Eigen::VectorXd&, const Eigen::VectorXd&, 
