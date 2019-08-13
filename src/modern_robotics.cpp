@@ -790,7 +790,7 @@ namespace mr {
 	*  M: The numerical inertia matrix M(thetalist) of an n-joint serial
 	*     chain at the given configuration thetalist.
 	* 
-	* This method sctricly follow the Featherstone RBDA2008.
+	* This method follows the Featherstone RBDA2008.
 	*/
 	Eigen::MatrixXd MassMatrixSimple(const Eigen::VectorXd& thetalist,
                                 const std::vector<Eigen::MatrixXd>& Mlist, 
@@ -822,7 +822,7 @@ namespace mr {
 	*  M: The numerical inertia matrix M(thetalist) of an n-joint serial
 	*     chain at the given configuration thetalist.
 	* 
-	* This method sctricly follow the Featherstone RBDA2008.
+	* This method follows the Featherstone RBDA2008, but assumes a single chain.
 	*/
 	Eigen::MatrixXd MassMatrixComposite(const Eigen::VectorXd& thetalist,
                            	const std::vector<Eigen::MatrixXd>& Mlist, 
@@ -860,6 +860,114 @@ namespace mr {
 			}
 		}
 		return H;
+	}
+
+	/* 
+	* Function: This function computes the Centroidal Momentum Matrix,
+	* and then compute Average Spatial Velocity.
+	* This method implements the algorithm of the paper: Centroidal 
+	* dynamics of a humanoid robot. D. Orin, A. Goswami, S. Lee.
+	*
+	* Inputs:
+	*  thetalist: n-vector of joint position variables
+	*  dthetalist: n-vector of joint velocity variables
+	*  Mlist: List of link frames {i} relative to {i-1} at the home position
+	*  Glist: Spatial inertia matrices Gi of the links
+	*  Slist: Screw axes Si of the joints in the space frame, in the format
+	*         of a matrix with the screw axes as the columns.
+	* 
+	* Outputs:
+	*  CMM: The Centroidal Momentum Matrix that transform the dthetalist to
+	*  the centroidal momentum of the robot.
+	* Warning:
+	*  This method currently only support the single chain robot because of
+	*  the implementation of ComputeCenterOfMassPosition.
+	*/
+	Eigen::MatrixXd CentroidalMomentumMatrix(
+		const Eigen::VectorXd& thetalist,
+		const Eigen::VectorXd& dthetalist,
+		const std::vector<Eigen::MatrixXd>& Mlist, 
+		const std::vector<Eigen::MatrixXd>& Glist, const Eigen::MatrixXd& Slist) {
+
+		const int n = thetalist.size();
+
+		std::vector<Eigen::MatrixXd> Iic(n+1, Eigen::MatrixXd::Zero(6, 6));
+		// Homogeneous transformations that transform Vi-1 in {i-1} frame to {i} frame.
+		std::vector<Eigen::MatrixXd> AdTi(n+1, Eigen::MatrixXd::Zero(6, 6));
+		// Homogeneous Transformation of each frame i in spatial frame.
+		Eigen::MatrixXd Mi = Eigen::MatrixXd::Identity(4, 4);
+		// Screw axis of joint i in frame i.
+		Eigen::MatrixXd Ai = Eigen::MatrixXd::Zero(6, n+1);
+
+		for(int i = 1; i < n+1; i++) {
+			Mi = Mi * Mlist[i-1]; // Frame i in spatial frame.
+			Ai.col(i) = mr::Adjoint(mr::TransInv(Mi)) * Slist.col(i-1); // get screw axis of joint i in frame i
+			AdTi[i] = mr::Adjoint(mr::MatrixExp6(mr::VecTose3(Ai.col(i)*-thetalist(i-1)))
+			          * mr::TransInv(Mlist[i-1])); // transform Vi-1 in {i-1} frame to {i} frame, MR P291.
+
+			Iic[i] = Glist[i-1];
+		}
+		// Back iterate to compute composite rigid body inertia.
+		for (int i = n; i > 0; --i) {
+			Iic[i-1] += AdTi[i].transpose() * Iic[i] * AdTi[i];
+		}
+		Eigen::Matrix<double, 6, 1> hG = Eigen::Matrix<double, 6, 1>::Zero();
+		// Adjoint transform average spatial velocity from CoM frame to frame 0;
+		Eigen::Vector3d p_cm = ComputeCenterOfMassPosition(thetalist, Mlist, Glist, Slist);
+		Eigen::Matrix<double, 6, 6> X_0G = mr::Adjoint(mr::RpToTrans(Eigen::Matrix3d::Zero(), p_cm));
+		Eigen::Matrix<double, 6, 6> X_iG = X_0G;
+		Eigen::Matrix<double, 6, n> A_G; // This is the same as CMM.
+		for (int i = 1; i < n+1; ++i) {
+			X_iG = AdTi[i] * X_iG;
+			A_G.col(i-1) = X_iG.transpose() * Iic[i] * Ai.col(i);
+			hG = hG + A_G.col(i-1) * dthetalist(i-1);
+		}
+		Eigen::Matrix<double, 6, 6> IG = X_0G.transpose() * Iic[0] * X_0G;
+		Eigen::Matrix<double, 6, 1> vG = IG.inverse() * hG;
+		Eigen::MatrixXd CMM = A_G;
+		return CMM;
+	}
+
+	/* 
+	* Function: This function computes the Center of Mass position 
+	* of a single chain robot in spatial frame.
+	*
+	* Inputs:
+	*  thetalist: n-vector of joint position variables
+	*  Mlist: List of link frames {i} relative to {i-1} at the home position
+	*  Glist: Spatial inertia matrices Gi of the links
+	*  Slist: Screw axes Si of the joints in the space frame, in the format
+	*         of a matrix with the screw axes as the columns.
+	* 
+	* Outputs:
+	*  p_cm: 3×1 vector of Center of Mass position in spatial frame.
+	* 
+	* Note:
+	*  This method assumes the frame of each link is located at the position of 
+	*  Center of Mass.
+	* Warning:
+	*  This function excludes the link0 mass, which means it is totally useless 
+	*  for a floating base system.
+	*/
+	Eigen::VectorXd ComputeCenterOfMassPosition(const Eigen::VectorXd& thetalist,
+							const std::vector<Eigen::MatrixXd>& Mlist, 
+							const std::vector<Eigen::MatrixXd>& Glist, const Eigen::MatrixXd& Slist) {
+
+		const int n = thetalist.size();
+
+		Eigen::VectorXd Mp = Eigen::VectorXd::Zero(3);
+		double M = 0;
+
+		// Homogeneous Transformation of each frame i in spatial frame.
+		Eigen::MatrixXd Mi = Eigen::MatrixXd::Identity(4, 4);
+		for (int i = 0; i < n; ++i) {
+			// Homogeneous transformations that transform Vi+1 in {i+1} frame to {i} frame, MR P291.
+			Eigen::MatrixXd AdTi = Mlist[i] * mr::Adjoint(mr::MatrixExp6(mr::VecTose3(Slist.col(i)*thetalist(i))); 
+			Mi = Mi * AdTi; // Frame i+1 in spatial frame.
+			Mp += Mi.block<3,1>(0,3) * Glist[i](5,5);
+			M += Glist[i](5,5);
+		}
+		return Mp / M;
 	}
 
 	/* 
